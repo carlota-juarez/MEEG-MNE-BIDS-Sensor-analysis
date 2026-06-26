@@ -5,11 +5,17 @@
 # Set up enviroment
 
 import json
-import os
+from pathlib import Path
 import subprocess
-from shutil import copyfile
-from distutils.dir_util import copy_tree
+from shutil import copyfile, rmtree, copytree
+import mne
+import mne_bids
+import logging
 
+# Logger configuration
+
+logging.basicConfig(level = logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Current path
 
@@ -17,26 +23,35 @@ __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file
 
 # Read the parameters from Brainlife 
 
-with open (os.path.join(__location__, 'config.json')) as f:
+config_path = __location__/'config.json'
+if not config_path.exists():
+    raise FileNotFoundError(f"The configuration file could not be found in {config_path}")
+
+with open (config_path, 'r') as f:
     config = json.load(f)
 
-# Entry and output paths 
+# Input paths 
+# The output of the last app is now configurated as the input (bids_root key)
+bids_root = config.get('bids_dir')
+if not bids_root:
+    raise ValueError("'bids_dir' parameter is required")
 
-bids_root = str(config['bids'])
-deriv_root = os.path.join(__location__, 'out_dir')
-html_report_dir = os.path.join(__location__, 'html_report')
+bids_root_path = Path(bids_root).resolve()
+
+# Output paths
+
+deriv_root = __location__/'out_dir'
+html_report_dir = __location__/'html_report'
 
 # Ensure output directories exist
 
-if not os.path.exists(deriv_root):
-    os.makedirs(deriv_root)
-if not os.path.exists(html_report_dir):
-    os.makedirs(html_report_dir)
+deriv_root.mkdir(parents = True, exist_ok = True)
+html_report_dir.mkdir(parents = True, exist_ok = True)
 
-# Copy the input folder ('app2_output') in the output folder ('out_dir') to have all the data there
+# Copy the input folder ('bids_root') in the output folder ('out_dir') to have all the data there
 
-if config['app2_output'] and os.path.exists(config['app2_output']):
-    copy_tree(config['app2_output'], deriv_root)
+if config.get('bids_root') and bids_root_path.exists():
+    copy_tree(config.get('bids_root'), deriv_root)
 
 # Rewrite the info in the .json file into a .py file
 
@@ -45,76 +60,131 @@ file_name = os.path.join(__location__, 'pipeline_config.py')
 # Inputs from the interface web to MNE variables
 
 with open(file_name, 'w') as f:
-    # -- General settings --
 
-    f.write(f"bids_root = '{bids_root}'\n")
+    f.write(f"bids_root = '{bids_root_path}'\n")
     f.write(f"deriv_root = '{deriv_root}'\n")
 
     # Condition contrast
 
-    if config['contrasts']:
-        f.write(f"contrasts = {config['contrasts']}\n")
+    contrasts = config.get('contrasts', [])
+    if contrasts:
+        f.write(f"contrasts = {contrasts}\n")
     
     # Decoding / MVPA
 
-    if config['decode']:
-        f.write(f"decode = {config['decode']}\n")
-        if config['decoding_which_epochs']:
-            f.write(f"decoding_which_epochs = '{config['decoding_which_epochs']}'\n")
-        if config['decoding_epochs_tmin']:
-            f.write(f"decoding_epochs_tmin = {config['decoding_epochs_tmin']}\n")
-        if config['decoding_epochs_tmax']:
-            f.write(f"decoding_epochs_tmax = {config['decoding_epochs_tmax']}\n")
-        if config['decoding_metric']:
-            f.write(f"decoding_metric = '{config['decoding_metric']}'\n")
-        if config['decoding_n_splits']:
-            f.write(f"decoding_n_splits = {config['decoding_n_splits']}\n")                
-        if config['decoding_time']:
-            f.write(f"decoding_time = {config['decoding_time']}\n")
-            if config['decoding_time_decim']:
-                f.write(f"decoding_time_decim = {config['decoding_time_decim']}\n")   
-        if config['decoding_time_generalization']:
-            f.write(f"decoding_time_generalization = {config['decoding_time_generalization']}\n") 
-            if config['decoding_time_generalization_decim']:
-                f.write(f"decoding_time_generalization_decim = {config['decoding_time_generalization_decim']}\n")   
-        if config['decoding_csp']:
-            f.write(f"decoding_csp = {config['decoding_csp']}\n")   
-            if config['decoding_csp_times']:
-                f.write(f"decoding_csp_times = {config['decoding_csp_times']}\n")   
-            if config['decoding_csp_freqs']:
-                f.write(f"decoding_csp_freqs = {config['decoding_csp_freqs']}\n")  
-        if config['n_boot']:
-            f.write(f"n_boot = {config['n_boot']}\n")
-        if config['cluster_forming_t_threshold']:
-            f.write(f"cluster_forming_t_threshold = {config['cluster_forming_t_threshold']}\n")
-        if config['cluster_n_permutations']:
-            f.write(f"cluster_n_permutations = {config['cluster_n_permutations']}\n")
-        if config['cluster_permutation_p_threshold']:
-            f.write(f"cluster_permutation_p_threshold = {config['cluster_permutation_p_threshold']}\n")
-        
+    decode = config.get('decode', True)
+    f.write(f"decode = {decode}\n")
+    if decode:
+        decoding_which_epochs = config.get('decoding_which_epochs', 'cleaned')
+        if decoding_which_epochs:
+            f.write(f"decoding_which_epochs = '{decoding_which_epochs}'\n")
+            
+        decoding_epochs_tmin = config.get('decoding_epochs_tmin', None)
+        if decoding_epochs_tmin:
+            f.write(f"decoding_epochs_tmin = {decoding_epochs_tmin}\n")
+            
+        decoding_epochs_tmax = config.get('decoding_epochs_tmax', None)
+        if decoding_epochs_tmax:
+            f.write(f"decoding_epochs_tmax = {decoding_epochs_tmax}\n")
+            
+        decoding_metric = config.get('decoding_metric', 'roc_auc')
+        if decoding_metric:
+            f.write(f"decoding_metric = '{decoding_metric}'\n")
+            
+        decoding_n_splits = config.get('decoding_n_splits')
+        if decoding_n_splits in [None, ""]:
+            decoding_n_splits = 5
+        f.write(f"decoding_n_splits = {decoding_n_splits}\n")                
+            
+        decoding_time = config.get('decoding_time', True)
+        f.write(f"decoding_time = {decoding_time}\n")
+        if decoding_time:    
+            decoding_time_decim = config.get('decoding_time_decim')
+            if decoding_time_decim in [None, ""]:
+                decoding_time_decim = 1
+            f.write(f"decoding_time_decim = {decoding_time_decim}\n")   
+                
+        decoding_time_generalization = config.get('decoding_time_generalization', False)
+        f.write(f"decoding_time_generalization = {decoding_time_generalization}\n") 
+        if decoding_time_generalization:    
+            decoding_time_generalization_decim = config.get('decoding_time_generalization_decim')
+            if decoding_time_generalization_decim in [None, ""]:
+                decoding_time_generalization_decim = 1
+            f.write(f"decoding_time_generalization_decim = {decoding_time_generalization_decim}\n")   
+                
+        decoding_csp = config.get('decoding_csp', False)
+        f.write(f"decoding_csp = {decoding_csp}\n")   
+        if decoding_csp:    
+            decoding_csp_times = config.get('decoding_csp_times', None)
+            if decoding_csp_times:
+                f.write(f"decoding_csp_times = {decoding_csp_times}\n")   
+                
+            decoding_csp_freqs = config.get('decoding_csp_freqs', None)
+            if decoding_csp_freqs:
+                f.write(f"decoding_csp_freqs = {decoding_csp_freqs}\n")  
+                
+        n_boot = config.get('n_boot')
+        if n_boot in [None, ""]:
+            n_boot = 5000
+        f.write(f"n_boot = {n_boot}\n")
+
+        # Only for group level       
+'''
+        cluster_forming_t_threshold = config.get('cluster_forming_t_threshold', None)
+        if cluster_forming_t_threshold:
+            f.write(f"cluster_forming_t_threshold = {cluster_forming_t_threshold}\n")
+            
+        cluster_n_permutations = config.get('cluster_n_permutations')
+        if cluster_n_permutations in [None, ""]:
+            cluster_n_permutations = 10000
+        f.write(f"cluster_n_permutations = {cluster_n_permutations}\n")
+            
+        cluster_permutation_p_threshold = config.get('cluster_permutation_p_threshold')
+        if cluster_permutation_p_threshold in [None, ""]:
+            cluster_permutation_p_threshold = 0.05
+        f.write(f"cluster_permutation_p_threshold = {cluster_permutation_p_threshold}\n")
+'''
+
     # Time-frequency analysis
 
-    if config['time_frequency_conditions']:
-        f.write(f"time_frequency_conditions = {config['time_frequency_conditions']}\n")
-    if config['time_frequency_freq_min']:
-        f.write(f"time_frequency_freq_min = {config['time_frequency_freq_min']}\n")
-    if config['time_frequency_freq_max']:
-        f.write(f"time_frequency_freq_max = {config['time_frequency_freq_max']}\n")
-    if config['time_frequency_subtract_evoked']:
-        f.write(f"time_frequency_subtract_evoked = {config['time_frequency_subtract_evoked']}\n")
-    if config['time_frequency_baseline']:
-        f.write(f"time_frequency_baseline = {config['time_frequency_baseline']}\n")
-    if config['time_frequency_baseline_mode']:
-        f.write(f"time_frequency_baseline_mode = {config['time_frequency_baseline_mode']}\n")
-    if config['time_frequency_crop']:
-        f.write(f"time_frequency_crop = {config['time_frequency_crop']}\n")
+    time_frequency_conditions = config.get('time_frequency_conditions', [])
+    if time_frequency_conditions:
+        f.write(f"time_frequency_conditions = {time_frequency_conditions}\n")
+        
+    time_frequency_freq_min = config.get('time_frequency_freq_min')
+    if time_frequency_freq_min in [None, ""]:
+        time_frequency_freq_min = 8
+    f.write(f"time_frequency_freq_min = {time_frequency_freq_min}\n")
+        
+    time_frequency_freq_max = config.get('time_frequency_freq_max')
+    if time_frequency_freq_max in [None, ""]:
+        time_frequency_freq_max = 40
+    f.write(f"time_frequency_freq_max = {time_frequency_freq_max}\n")
+        
+    time_frequency_cycles = config.get('time_frequency_cycles', None)
+    if time_frequency_cycles:
+        f.write(f"time_frequency_cycles = {time_frequency_cycles}\n")
+
+    time_frequency_subtract_evoked = config.get('time_frequency_subtract_evoked', False)
+    f.write(f"time_frequency_subtract_evoked = {time_frequency_subtract_evoked}\n")
+        
+    time_frequency_baseline = config.get('time_frequency_baseline', None)
+    if time_frequency_baseline:
+        f.write(f"time_frequency_baseline = {time_frequency_baseline}\n")
+        
+    time_frequency_baseline_mode = config.get('time_frequency_baseline_mode', 'mean')
+    if time_frequency_baseline_mode:
+        f.write(f"time_frequency_baseline_mode = '{time_frequency_baseline_mode}'\n")
+        
+    time_frequency_crop = config.get('time_frequency_crop', None)
+    if time_frequency_crop:
+        f.write(f"time_frequency_crop = {time_frequency_crop}\n")
     
     # Group level analysis
-
-    if config['interpolate_bads_grand_average']:
-        f.write(f"interpolate_bads_grand_average = {config['interpolate_bads_grand_average']}\n")
-
-    f.close()
+'''
+    interpolate_bads_grand_average = config.get('interpolate_bads_grand_average', True)
+    f.write(f"interpolate_bads_grand_average = {interpolate_bads_grand_average}\n")
+'''
 
 # Run python script
 
@@ -127,10 +197,12 @@ except subprocess.CalledProcessError as e:
 
 # Find the reports and make a copy in out_html folder
 
-for dirpaths, dirnames, filenames in os.walk(deriv_root):
-    for filename in [f for f in filenames if f.endswith(".html")]:
-        print(filename)
-        copyfile(os.path.join(dirpaths, filename), os.path.join(html_report_dir, filename))
+real_deriv_root = deriv_root.resolve()
+
+for path in real_deriv_root.rglob("*.html"):
+    if "sub-average" not in path.name:
+        logger.info(f"{path.name} copied to the output")
+        copyfile(path, html_report_dir/path.name)
 
 
 
