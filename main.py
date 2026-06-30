@@ -186,9 +186,7 @@ with open(file_name, 'w') as f:
     f.write(f"time_frequency_subtract_evoked = {time_frequency_subtract_evoked}\n")
         
     time_frequency_baseline = config.get('time_frequency_baseline', None)
-    if isinstance(time_frequency_baseline, list) and len(time_frequency_baseline) == 2 
-    and time_frequency_baseline[0] not in [None, 'null', ''] 
-    and time_frequency_baseline[1] not in [None, 'null', ""]:
+    if isinstance(time_frequency_baseline, list) and len(time_frequency_baseline) == 2 and time_frequency_baseline[0] not in [None, 'null', ''] and time_frequency_baseline[1] not in [None, 'null', ""]:
         p1, p2 = time_frequency_baseline
         f.write(f"time_frequency_baseline = ({p1}, {p2})\n")
     elif task_is_rest:
