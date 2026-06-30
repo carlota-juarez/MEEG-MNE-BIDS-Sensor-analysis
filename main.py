@@ -146,7 +146,7 @@ with open(file_name, 'w') as f:
         f.write(f"n_boot = {n_boot}\n")
 
         # Only for group level       
-'''
+    '''
         cluster_forming_t_threshold = config.get('cluster_forming_t_threshold', None)
         if cluster_forming_t_threshold:
             f.write(f"cluster_forming_t_threshold = {cluster_forming_t_threshold}\n")
@@ -160,7 +160,7 @@ with open(file_name, 'w') as f:
         if cluster_permutation_p_threshold in [None, ""]:
             cluster_permutation_p_threshold = 0.05
         f.write(f"cluster_permutation_p_threshold = {cluster_permutation_p_threshold}\n")
-'''
+    '''
 
     # Time-frequency analysis
 
@@ -207,10 +207,10 @@ with open(file_name, 'w') as f:
         f.write(f"time_frequency_crop = {time_frequency_crop}\n")
     
     # Group level analysis
-'''
+    '''
     interpolate_bads_grand_average = config.get('interpolate_bads_grand_average', True)
     f.write(f"interpolate_bads_grand_average = {interpolate_bads_grand_average}\n")
-'''
+    '''
 
 # Run python script
 
