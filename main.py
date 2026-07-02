@@ -64,9 +64,20 @@ with open(file_name, 'w') as f:
 
     f.write(f"bids_root = '{bids_root_path}'\n")
     f.write(f"deriv_root = '{deriv_root}'\n")
-    f.write(f"ch_types = ['eeg']\n")
 
     # General settings (always nedeed)
+
+    data_type = config.get('data_type')
+    if not data_type:
+        raise ValueError("'data_type' parameter is required (must be 'eeg' or 'meg')")
+    f.write(f"data_type = '{data_type}'\n")
+
+    if data_type == 'eeg':
+        ch_types = ['eeg']
+    else:
+        meg_ch_types = config.get('meg_ch_types', 'meg')
+        ch_types = [meg_ch_types]
+    f.write(f"ch_types = {ch_types}\n")
 
     subject = '001'
     f.write(f"subjects = ['{subject}']\n")
@@ -74,9 +85,17 @@ with open(file_name, 'w') as f:
     task = config.get('task', None)
     if task:
         f.write(f"task = '{task}'\n")
+    else:
+        raise ValueError("'task' parameter is required")  
 
     task_is_rest = config.get('task_is_rest', False)
     f.write(f"task_is_rest = {task_is_rest}\n")
+
+    conditions = config.get('conditions', None)
+    if conditions:
+        f.write(f"conditions = {conditions}\n")
+    else:
+        raise ValueError("'conditions' parameter is required unless task_is_rest is True")
 
     interactive = config.get('interactive', False)
     f.write(f"interactive = {interactive}\n")
@@ -147,7 +166,7 @@ with open(file_name, 'w') as f:
             n_boot = 5000
         f.write(f"n_boot = {n_boot}\n")
 
-        # Only for group level       
+    # Only for group level       
     '''
         cluster_forming_t_threshold = config.get('cluster_forming_t_threshold', None)
         if cluster_forming_t_threshold:
