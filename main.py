@@ -1,6 +1,12 @@
+# Copyright (c) 2026 brainlife.io
+
 # This file is a MNE python-based brainlife.io App
 
-# Carlota Juárez Alonso
+# Author: Guiomar Niso Galán
+# Author: Carlota Juárez Alonso
+# Neuroimaging Group, Cajal Neuroscience Center, CSIC
+
+# 03/07/2026
 
 # Set up enviroment
 
