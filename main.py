@@ -85,7 +85,7 @@ with open(file_name, 'w') as f:
         ch_types = [meg_ch_types]
     f.write(f"ch_types = {ch_types}\n")
 
-    subject = '001'
+    subject = '01'
     f.write(f"subjects = ['{subject}']\n")
 
     task = config.get('task', None)
