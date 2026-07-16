@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   #imprescindible para poder publicar en ghcr.io
+      packages: write   # Required in order to publish on ghcr.io
 
     steps:
       - name: Checkout repo
