@@ -1,6 +1,6 @@
 {
   "bids_dir": "bids_dir_preprocessed_test",
-  "data_type": "eeg",
+  "data_type": "eeg", 
   "eeg_template_montage": "standard_1020",
   "meg_ch_types": "meg",
   "task_is_rest": false,
